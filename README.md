@@ -29,7 +29,7 @@ Where:
 This script solves this equation numerically, ensuring an accurate annualized return regardless of the timing or magnitude of capital injections.
 
 ### 🛠️ Tech Stack
-- **Python 3.x**
+- **Python 3.10**
 - **Pandas & NumPy:** For data transformation and vectorization.
 - **SciPy:** Implementing `optimize.newton` for numerical approximations.
 - **YFinance:** Market data retrieval.
