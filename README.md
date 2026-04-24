@@ -1,5 +1,4 @@
-##Investment Performance Analyzer (XIRR Method)
-This project calculates the Annualized Return (XIRR) of a stock portfolio using transaction data. Making use of my astrophysics background, I developed this tool to apply numerical root-finding methods to personal financial data.
+![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white) ![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white) ![Yahoo!](https://img.shields.io/badge/Yahoo!-6001D2?style=for-the-badge&logo=Yahoo!&logoColor=white) ![SciPy](https://img.shields.io/badge/SciPy-%230C55A5.svg?style=for-the-badge&logo=scipy&logoColor=%white)
 
 ## Investment Performance Analyzer (XIRR Method)
 
@@ -8,6 +7,7 @@ For comparison, this code also provides the annualized return had the same amoun
 
 ## Result Highlight
 Our investment strategy is picking a combination of momentum and value stocks. Starting in October 2024, 61 investments were done into 36 different stocks and etfs.
+
 At 24.04.2026, our investment strategy gave an annualized return of **30.3%**. The S&P500 benchmark gave an annualized return of **22.0%**. Conclusion: our investment strategy works well and beats the S&P 500 by large margin
 
 ### 🚀 Key Features
