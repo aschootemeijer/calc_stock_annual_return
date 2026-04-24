@@ -1,4 +1,3 @@
-
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -106,8 +105,7 @@ class AnnualReturnInvestigation:
         d_raw = self.load_stocks()
 
         # PRE-PROCESSING
-        dividend_in_eur = 559
-        #dividend_in_eur = 32.88
+        dividend_in_eur = 32.88
         d = self.add_cashflow_column( d_raw, dividend_in_eur )
         d = self.add_currency_column_quickly( d )
         d['current_value_per_stock'] = d['ticker'].apply( self.add_column_with_current_value_per_stock )
@@ -115,7 +113,6 @@ class AnnualReturnInvestigation:
 
         # CASHFLOW OF CURRENT HOLDINGS. Where delta_n_stock=0 (rows reserved for current holdings), assign currently held stock value
         d.loc[ d['delta_n_stock']==0, 'cashflow' ] = d['current_total_eur']
-        #print( d.iloc[6:26] )
 
         avg_ylry_returns = self.calc_xirr( d['cashflow'], d['date'])
         print( f'\nOur investments. Annual return: {avg_ylry_returns}%' ) 
@@ -132,14 +129,12 @@ class BenchmarkWithSP500( AnnualReturnInvestigation ):
     def add_sp500_columns( self, d ):
         d['date']          = pd.to_datetime( d['date'] )
         sp500              = yf.download( '^GSPC',start=d['date'].min(), end=self.vandaag)
-        #sp500              = yf.download( '^GDAXI',start=d['date'].min(), end=self.vandaag)
         sp500.columns      = sp500.columns.get_level_values(0)
         sp500              = sp500.reset_index()
         sp500_now          = sp500.Close.iloc[-1]
         d                  = d.merge( sp500[['Date','Close']], how='left', left_on='date', right_on='Date' )
         d                  = d.rename( columns={'Close':'SP500'} )
         d['delta_n_sp500'] = [ t/s for t,s in zip(d['transaction_total_eur'],d['SP500']) ] 
-        #d['SP500_now_div_then'] = sp500_now / d.Close
         d = d.drop( columns=['Date','broker'] )
 
         d['cashflow']      = [-t if dn>= 0 else t for dn,t in zip(d['delta_n_stock'],d['transaction_total_eur'])]
@@ -149,15 +144,11 @@ class BenchmarkWithSP500( AnnualReturnInvestigation ):
         d.loc[ len(d),'name']          = 'current_value'
         d.at[ d.index[-1],'cashflow' ] = current_value
         d.at[ d.index[-1], 'date' ]    = pd.Timestamp.now().normalize()  # self.vandaag
-        #for i in d.index:
-        #    print( d.loc[i,'cashflow'], d.loc[i,'date'] )
-        #print( d['delta_n_sp500'] )
         return d
 
     def run_benchmark( self ):
         d_raw = self.load_stocks()
         d     = self.add_sp500_columns( d_raw )
-        #print( d[39:] )
         avg_ylry_returns = self.calc_xirr( d['cashflow'], d['date'])
         print( f'\nBenchmarking with S&P500. Annual return: {avg_ylry_returns}%' ) 
         print( f"Total profit: {np.round( sum(d['cashflow']),2 )} EUR" )
@@ -169,87 +160,3 @@ if __name__ == "__main__":
 
     benchmark = BenchmarkWithSP500( )
     benchmark.run_benchmark( )
-
-
-exit()
-
-
-
-
-
-
-profit = 8200            # including dividend
-
-d = pd.read_csv( '/mnt/c/Users/hp/Desktop/dinges/fin/resultaten_evalueren/gekochte_stox.csv', delimiter=',' )
-print( d.columns )
-print( len(d.columns) )
-
-d['cumsum_eur'] = d['totaalprijs_eur'].cumsum()
-d['datum']      = pd.to_datetime( d['datum'] )
-vandaag         = pd.Timestamp.now()
-tijdsverschil   = vandaag - d['datum']
-d['delta_jaar'] = tijdsverschil.dt.days / 365.25
-d['euro_jaar']  = d['delta_jaar'] * d['totaalprijs_eur']
-
-plt.plot( d.datum, d.cumsum_eur )
-
-sum_euro_jaar   = sum(d['euro_jaar']) 
-total_inv       = d.cumsum_eur.iloc[-1]
-jaar_sinds_start= max(d.delta_jaar)
-
-
-##########################
-## GET S&P500 Close values
-sp500     = yf.download( '^GSPC',start=d['datum'].min(), end=vandaag)
-sp500.columns = sp500.columns.get_level_values(0)
-sp500 = sp500.reset_index()
-sp500_now = sp500.Close.iloc[-1]
-d = d.merge( sp500[['Date','Close']], how='left', left_on='datum', right_on='Date' )
-d['SP500_now_div_then'] = (d.Close / sp500_now)**-1
-
-def get_currency( ticker ):   # THIS WORKS well but is very slow; half a second per ticker
-    try:
-        curr = yf.Ticker( ticker ).info.get( 'currency','EUR' )
-        return curr
-    except Exception:
-        return 'NOT found'
-
-def get_currency_quickly( d ):   # this has been tested - it gives the same currencies as the get_currency() method 
-   d['currency'] = np.where( (d['ticker'].str.contains(r'\.') & (d['ticker']!='XNID.L')), 'EUR', 'USD' )
-   return d
-
-
-
-
-
-
-###################
-# onzin(?)-functies
-
-if 1>2:
-    def organize_in_holding_periods( self, d ):
-        dts = []
-        d['total_n_stock'] = d['delta_n_stock'] # we overwrite all but the first entry per stock below
-        for t in d['ticker'].unique():
-            dt = d[ d['ticker'] == t ].copy()
-            dt = dt.sort_values( by='date', ascending=True )
-            dt['begin_date']    = dt['date']
-            dt['end_date']      = dt['date'].shift(-1)
-            dt['total_n_stock'] = dt['delta_n_stock'].cumsum()
-            dt['cashflow']      = dt['total_n_stock'] 
-            dts.append(dt)
-            print( '\n', dt )
-        dp = pd.concat( dts ).reset_index( drop=True )
-        #dp = dp.drop( columns=['date','delta_n_stock','broker'] )
-        dp = dp.drop( columns=['date','broker'] )
-
-        dp['begin_date'] = pd.to_datetime(dp['begin_date'])
-        dp['end_date']   = pd.to_datetime(dp['end_date'])
-        dp['duration_d'] = (dp['end_date'].fillna( pd.Timestamp.now().normalize() ) - dp['begin_date']).dt.days
-        #tijdsverschil   = vandaag - dp['datum']
-        #d['delta_jaar'] = tijdsverschil.dt.days / 365.25
-        return dp
-
-
-
-
