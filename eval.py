@@ -21,8 +21,7 @@ class AnnualReturnInvestigation:
         self.vandaag = pd.Timestamp.now().date() #.normalize()
 
     def load_stocks( self ):
-        d = pd.read_csv( '/mnt/c/Users/hp/Desktop/dinges/fin/resultaten_evalueren/gekochte_stox.csv', delimiter=',' )
-        #d = pd.read_csv( 'stock_transactions_normalized.csv', delimiter=',' )
+        d = pd.read_csv( 'stock_transactions_normalized.csv', delimiter=',' )
         return d
 
     def add_currency_column( self, ticker ):   # THIS WORKS well but is very slow; half a second per ticker
