@@ -18,7 +18,7 @@ class AnnualReturnInvestigation:
     """
 
     def __init__( self ):
-        self.vandaag = pd.Timestamp.now().date() #.normalize()
+        self.vandaag = pd.Timestamp.now().date()
 
     def load_stocks( self ):
         d = pd.read_csv( 'stock_transactions_normalized.csv', delimiter=',' )
