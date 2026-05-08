@@ -1,6 +1,6 @@
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white) ![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white) ![Yahoo!](https://img.shields.io/badge/Yahoo!-6001D2?style=for-the-badge&logo=Yahoo!&logoColor=white) ![SciPy](https://img.shields.io/badge/SciPy-%230C55A5.svg?style=for-the-badge&logo=scipy&logoColor=%white)
 
-## Investment Performance Analyzer (annual return with XIRR Method)
+## Annual return calculator (XIRR Method)
 
 This project calculates the annualized return of an investment portfolio based on transaction data. Making use of my astrophysics background, I developed this tool to apply numerical optimization methods to financial datasets.
 This code also provides a benchmark annualized return for a scenario where the same amount had been invested in the S&P500 at the same dates.
