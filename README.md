@@ -6,9 +6,9 @@ This project calculates the annualized return of an investment portfolio based o
 This code also provides a benchmark annualized return for a scenario where the same amount had been invested in the S&P500 at the same dates.
 
 ### 🌠 Result Highlight
-My investment strategy is picking a combination of momentum and value stocks. Starting in October 2024, 61 investments were done into 36 different stocks and etfs. The investments, which are real investments, are in the csv in this folder, but normalized to €100 for the first investment for privacy reasons.
+My investment strategy is picking a combination of momentum and value stocks. Starting in October 2024, over 67 investments were done into over 42 different stocks and etfs. The investments, which are real investments, are in the csv in this folder, but normalized to €100 for the first investment for privacy reasons.
 
-At 08.05.2026, our investment strategy gave an annualized return of **39%**. The S&P500 benchmark gave an annualized return of **21%**. Conclusion: our investment strategy works well and beats the S&P 500 by large margin.
+At 28.05.2026, our investment strategy gave an annualized return of **53%**. The S&P500 benchmark gave an annualized return of **37%** (this number is also high because investments were done at favorable times). Conclusion: our investment strategy works well and beats the S&P 500 by a large margin.
 
 ### 🚀 Key Features
 - **Automated Data Extraction:** Leverages the `yfinance` API for real-time market prices and currency conversion (USD/EUR).
