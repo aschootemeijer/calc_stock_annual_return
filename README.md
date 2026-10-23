@@ -1,5 +1,3 @@
-##Investment Performance Analyzer (XIRR Method)
-This project calculates the Annualized Return (XIRR) of a stock portfolio using transaction data. Making use of my astrophysics background, I developed this tool to apply numerical root-finding methods to personal financial data.
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![Pandas](https://img.shields.io/badge/pandas-%23150458.svg?style=for-the-badge&logo=pandas&logoColor=white) ![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white) ![Yahoo!](https://img.shields.io/badge/Yahoo!-6001D2?style=for-the-badge&logo=Yahoo!&logoColor=white) ![SciPy](https://img.shields.io/badge/SciPy-%230C55A5.svg?style=for-the-badge&logo=scipy&logoColor=%white)
 
 ## Investment Performance Analyzer (XIRR Method)
@@ -8,9 +6,14 @@ This project calculates the annualized return (**XIRR**) of an investment portfo
 For comparison, this code also provides the annualized return had the same amount at the same dates been invested in the S&P500.
 
 ## Result Highlight
-Our investment strategy is picking a combination of momentum and value stocks. Starting in October 2024, 61 investments were done into 36 different stocks and etfs.
+Investment strategy: we pick stocks from the momentum strategy we devised (https://github.com/aschootemeijer/sp500_strategy_backtesting). 
+Starting in May 2026, 11 different stocks were purchased (listed in stock_transactions_normalized.csv). None have been sold so far. At 23.10.2026, the result was as follows:
+- Our investment strategy gave an annualized return of **62.5%**. 
+- The S&P500 benchmark gave an annualized return of **9.7%**. 
+Conclusion: given the low number of investments (11) and short holding periods (0-5 months), this offers less support for the momentum strategy than the backtesting.
+Still, these first results are very encouraging and provide further support that our momentum strategy works.
 
-At 24.04.2026, our investment strategy gave an annualized return of **30.3%**. The S&P500 benchmark gave an annualized return of **22.0%**. Conclusion: our investment strategy works well and beats the S&P 500 by large margin
+<small>Notes on the stock selection: 1. to keep a sufficiently diversified portfolio, not all stocks for wich the buy signal triggered were bought. 2. 3/11 momentum stocks are not in the buy signal list. They are momentum stocks but with a slightly smaller momentum_factor</small>
 
 ### 🚀 Key Features
 - **Automated Data Extraction:** Leverages the `yfinance` API for real-time market prices and currency conversion (USD/EUR).
