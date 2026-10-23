@@ -41,5 +41,6 @@ This script solves this equation numerically, ensuring an accurate annualized re
 - **SciPy:** Implementing `optimize.newton` for numerical approximations.
 
 ### 💻 Usage
-- Clone the repository, e.g., `git clone https://github.com/aschootemeijer/calc_stock_annual_return`
-- Execute eval.py, .e.g., enter in a linux terminal: `python3 eval.py`
+Clone the repository and execute eval.py. E.g., in a Linux terminal, enter:
+- `git clone https://github.com/aschootemeijer/calc_stock_annual_return`
+- `python3 eval.py`
