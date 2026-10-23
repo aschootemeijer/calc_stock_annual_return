@@ -1,4 +1,18 @@
+"""
+Calculates the annual return (XIRR) of a stock portfolio, and compares it with a benchmark index
+in which the same euro amounts were invested (and withdrawn) at the same dates.
+
+Input: a csv file with per transaction: name, ticker, date, delta_n_stock
+(positive for a buy, negative for a sale) and transaction_total_eur (always positive).
+
+How it works:
+  1. Every buy is money out (negative cashflow), every sale money in (positive).
+  2. What we still hold is counted as if sold today (positive cashflow), plus dividends.
+  3. XIRR: the yearly rate at which all these cashflows, discounted to the first date, sum to zero.
+The benchmark does the same, but with every euro going into an index instead.
+"""
 import time
+from abc import ABC, abstractmethod
 
 import numpy as np
 import pandas as pd
@@ -18,179 +32,187 @@ DIVIDENDS_EUR = {  # total dividend received so far
 }
 
 
-class AnnualReturnInvestigation:
+# ---------- Investments ----------
+
+class Investment(ABC):
     """
-    Calculates the annual return (XIRR) of an investment portfolio.
-    Input: a csv file with per transaction: name, ticker, date, delta_n_stock
-    (positive for a buy, negative for a sale) and transaction_total_eur (always positive).
-    Output: annual return in percent and total profit in EUR.
+    Base class: an investment made with the transactions from the csv file.
+    Subclasses only define what the investment is worth today, in value_today.
     """
 
-    def __init__(self):
-        self.today = pd.Timestamp.now().date()
+    def __init__(self, label, transactions, usd_to_eur, today):
+        self.label = label
+        self.transactions = transactions
+        self.usd_to_eur = usd_to_eur
+        self.today = today
 
-    def load_transactions(self):
-        return pd.read_csv(CSV_FILE)
+    def transaction_cashflows(self):
+        """ Buys (delta_n_stock > 0) are negative cashflow, sales (delta_n_stock < 0) positive """
+        direction = np.sign(self.transactions['delta_n_stock'])
+        return pd.DataFrame({
+            'date': self.transactions['date'],
+            'cashflow': -direction * self.transactions['transaction_total_eur'],
+        })
 
-    def lookup_currency(self, ticker):
-        """
-        Slow (about half a second per ticker), so not used in the calculation.
-        Use it to check that add_currency_column assigns the right currencies.
-        """
-        try:
-            return yf.Ticker(ticker).info.get('currency', 'EUR')
-        except Exception:
-            return 'NOT found'
+    @abstractmethod
+    def value_today(self):
+        """ What we would get if we sold everything today: a list of amounts in EUR """
 
-    def add_currency_column(self, d):
-        """
-        Rule of thumb, checked against lookup_currency for the stocks purchased so far:
-        tickers without an exchange suffix (US) and London tickers (*.L) are in USD,
-        other European tickers (e.g. *.DE) in EUR.
-        The dividend row has no ticker; it is already in EUR.
-        """
-        is_european = d['ticker'].str.contains(r'\.', na=False)
-        is_london = d['ticker'].str.endswith('.L', na=False)
-        d['currency'] = np.where(is_european & ~is_london, 'EUR', 'USD')
-        d.loc[d['ticker'].isna(), 'currency'] = 'EUR'
-        return d
+    def cashflows(self):
+        today_rows = pd.DataFrame({'date': self.today, 'cashflow': self.value_today()})
+        return pd.concat([self.transaction_cashflows(), today_rows], ignore_index=True)
 
-    def add_cashflow_column(self, d, dividend_in_eur):
-        """
-        Adds the cashflow column, which is what the annual return is calculated from.
-        Bought stocks are negative cashflow; sold stocks, dividend and current holdings are positive cashflow.
-        Per stock, it calculates the number of stocks held after each transaction, and adds a row
-        for today in which the value of the current holdings is filled in later.
-        """
-        per_stock = []
-        for ticker in d['ticker'].unique():
-            dt = d[d['ticker'] == ticker].sort_values('date')
-            dt['total_n_stock'] = dt['delta_n_stock'].cumsum()
-            # copy the last row as today's row; its cashflow is set once today's value is known
-            dt = pd.concat([dt, dt.iloc[[-1]]], ignore_index=True)
-            last = dt.index[-1]
-            dt.at[last, 'date'] = self.today
-            dt.at[last, 'delta_n_stock'] = 0
-            dt.at[last, 'transaction_total_eur'] = 0
-            dt['cashflow'] = [-total if dn > 0 else total if dn < 0 else 0
-                              for dn, total in zip(dt['delta_n_stock'], dt['transaction_total_eur'])]
-            per_stock.append(dt)
-        d = pd.concat(per_stock).reset_index(drop=True)
+    def report(self):
+        cashflows = self.cashflows()
+        annual_return = calc_xirr(cashflows['cashflow'], cashflows['date'])
+        profit = cashflows['cashflow'].sum()
+        print(f'{self.label:<20} Annual return: {annual_return:6.1%}   Total profit: {profit:10.2f} EUR')
 
-        # the dividend received so far is added as one final row
-        d.loc[len(d)] = {'cashflow': dividend_in_eur}
-        d.at[d.index[-1], 'date'] = self.today
-        d.at[d.index[-1], 'name'] = 'dividend'
-        return d
 
-    def get_current_price(self, ticker):
-        """ Gets the current stock price from Yahoo Finance, in the stock's own currency """
-        try:
-            t = yf.Ticker(ticker)
-            price = t.fast_info['last_price']
-            if price is None or pd.isna(price):
-                price = t.basic_info['last_price']
-            return price
-        except Exception:
-            try:
-                return yf.Ticker(ticker).info.get('regularMarketPrice')
-            except Exception:
-                return None
+class Portfolio(Investment):
+    """ The stocks we actually bought: the current value of the holdings plus the dividend received so far """
 
-    def add_current_value_column(self, d):
-        usd_to_eur = yf.Ticker('EUR=X').fast_info['last_price']
-        d['current_total_eur'] = [n * price if currency == 'EUR' else n * price * usd_to_eur
-                                  for currency, n, price in zip(d['currency'], d['total_n_stock'], d['current_price'])]
-        d['current_total_eur'] = np.round(d['current_total_eur'], 2)
-        return d
+    def __init__(self, transactions, usd_to_eur, today, dividend_eur):
+        super().__init__('Our investments', transactions, usd_to_eur, today)
+        self.dividend_eur = dividend_eur
+        self.holdings = self.get_holdings()
 
-    def calc_xirr(self, cashflows, dates):
-        """
-        (X)IRR: Internal Rate of Return (or annual return)
-        XNPV:   eXtended Net Present Value. Essentially uses time difference between cashflows.
-        The correct rate (annual return) is the one for which the sum of the XNPV is zero
-        """
-        if pd.isna(cashflows).any():
-            raise ValueError('Cannot calculate XIRR: some cashflows are missing (NaN).')
-        dates = pd.to_datetime(dates)
+    def get_holdings(self):
+        """ Stocks currently held, with their current value in EUR """
+        holdings = (self.transactions.groupby('ticker', as_index=False)
+                    .agg(name=('name', 'first'), n_stock=('delta_n_stock', 'sum')))
+        holdings = holdings[~np.isclose(holdings['n_stock'], 0)].reset_index(drop=True)
+        holdings['currency'] = currency_from_ticker(holdings['ticker'])
+        holdings['price'] = holdings['ticker'].map(get_current_price)
 
-        def xnpv(rate):
-            start_date = min(dates)
-            return sum(cf / (1 + rate)**((d - start_date).days / 365.25) for cf, d in zip(cashflows, dates))
-
-        # Newton-Raphson method to find the rate at which XNPV is 0. Raises RuntimeError if it does not converge
-        return np.round(newton(xnpv, 0.1) * 100, 1)
-
-    def run_investigation(self):
-        d = self.load_transactions()
-        d = self.add_cashflow_column(d, DIVIDENDS_EUR[CSV_FILE])
-        d = self.add_currency_column(d)
-
-        d['current_price'] = d['ticker'].apply(self.get_current_price)
-        missing = d.loc[d['ticker'].notna() & d['current_price'].isna(), 'ticker'].unique()
+        missing = holdings.loc[holdings['price'].isna(), 'ticker']
         if len(missing) > 0:
             raise ValueError(f'Could not get a current price for: {", ".join(missing)}')
-        d = self.add_current_value_column(d)
 
-        # today's rows (delta_n_stock == 0) get the value of the current holdings as cashflow
-        d.loc[d['delta_n_stock'] == 0, 'cashflow'] = d['current_total_eur']
-        print('PORTFOLIO DATAFRAME:\n', d)
-        annual_return = self.calc_xirr(d['cashflow'], d['date'])
-        print(f'\nOur investments. Annual return: {annual_return}%')
-        print(f"Total profit: {np.round(sum(d['cashflow']), 2)} EUR")
+        to_eur = np.where(holdings['currency'] == 'USD', self.usd_to_eur, 1.0)
+        holdings['value_eur'] = (holdings['n_stock'] * holdings['price'] * to_eur).round(2)
+        return holdings
+
+    def value_today(self):
+        return [self.holdings['value_eur'].sum(), self.dividend_eur]
 
 
-class BenchmarkComparison(AnnualReturnInvestigation):
+class Benchmark(Investment):
     """
-    Calculates the annual return had we invested in the benchmark index instead of the stocks we chose,
-    with the same euro amounts at the same dates (buys and sales).
-    Inherits load_transactions and calc_xirr from AnnualReturnInvestigation.
+    The same euro amounts invested in a benchmark index: each buy adds index units at that day's price,
+    each sale removes them. Today's value is that of the index units still held.
     """
 
-    def download_daily(self, ticker, start):
-        """ Daily Open prices from Yahoo Finance, forward-filled over weekends and holidays """
-        data = yf.download(ticker, start=start, end=self.today, auto_adjust=True)
-        data.columns = data.columns.get_level_values(0)
-        return data['Open'].asfreq('D').ffill()
+    def __init__(self, transactions, usd_to_eur, today, benchmark):
+        super().__init__(f'Benchmark ({benchmark})', transactions, usd_to_eur, today)
+        self.benchmark = benchmark
+        daily_price_eur, self.price_now_eur = self.index_prices_eur()
+        self.units_held = self.get_units_held(daily_price_eur)
 
-    def add_benchmark_columns(self, d):
-        bench = BENCHMARKS[BENCHMARK]
-        d['date'] = pd.to_datetime(d['date'])
-        d_bench = self.download_daily(bench['ticker'], start=d['date'].min())
-        if bench['currency'] == 'USD':  # convert the index to EUR at each day's exchange rate
-            usd_to_eur = self.download_daily('EUR=X', start=d['date'].min())
-            d_bench = (d_bench * usd_to_eur).ffill()
-        d_bench = d_bench.rename('bench_price_eur').rename_axis('date').reset_index()
-        bench_now_eur = d_bench['bench_price_eur'].iloc[-1]
-        d = d.merge(d_bench, how='left', on='date')
+    def index_prices_eur(self):
+        """ Daily index prices since the first transaction, and the current index price, both in EUR """
+        bench = BENCHMARKS[self.benchmark]
+        daily_price = download_daily_open(bench['ticker'], start=self.transactions['date'].min(), end=self.today)
+        price_now = get_current_price(bench['ticker'])
+        if bench['currency'] == 'USD':  # convert to EUR at each day's exchange rate
+            daily_usd_to_eur = download_daily_open('EUR=X', start=daily_price.index[0], end=self.today)
+            daily_price = (daily_price * daily_usd_to_eur).ffill()
+            price_now *= self.usd_to_eur
+        return daily_price, price_now
 
-        # buys (delta_n_stock > 0) add benchmark units and are negative cashflow; sales remove units and are positive cashflow
-        direction = np.sign(d['delta_n_stock'])
-        d['delta_n_bench'] = direction * d['transaction_total_eur'] / d['bench_price_eur']
-        d['cashflow'] = -direction * d['transaction_total_eur']
+    def get_units_held(self, daily_price_eur):
+        """ Index units bought minus index units sold, at the index price on each transaction date """
+        price_on_date = self.transactions['date'].map(daily_price_eur)
+        if price_on_date.isna().any():
+            missing_dates = self.transactions.loc[price_on_date.isna(), 'date'].dt.date.tolist()
+            raise ValueError(f'No {self.benchmark} price for: {missing_dates}')
 
-        # final row: today's value of the benchmark units still held
-        d.loc[len(d), 'name'] = 'current_value'
-        d.at[d.index[-1], 'cashflow'] = d['delta_n_bench'].sum() * bench_now_eur
-        d.at[d.index[-1], 'bench_price_eur'] = bench_now_eur
-        d.at[d.index[-1], 'date'] = pd.Timestamp(self.today)
-        return d
+        direction = np.sign(self.transactions['delta_n_stock'])
+        return (direction * self.transactions['transaction_total_eur'] / price_on_date).sum()
 
-    def run_benchmark(self):
-        d = self.load_transactions()
-        d = self.add_benchmark_columns(d)
-        print('BENCHMARK DATAFRAME:\n', d)
-        annual_return = self.calc_xirr(d['cashflow'], d['date'])
-        print(f'\nBenchmarking with {BENCHMARK}. Annual return: {annual_return}%')
-        print(f"Total profit: {np.round(sum(d['cashflow']), 2)} EUR")
+    def value_today(self):
+        return [self.units_held * self.price_now_eur]
+
+
+# ---------- Annual return ----------
+
+def calc_xirr(cashflows, dates):
+    """
+    (X)IRR: Internal Rate of Return (or annual return)
+    XNPV:   eXtended Net Present Value. Essentially uses time difference between cashflows.
+    The correct rate (annual return) is the one for which the XNPV is zero
+    """
+    if cashflows.isna().any():
+        raise ValueError('Cannot calculate XIRR: some cashflows are missing (NaN).')
+    cashflows = cashflows.to_numpy()
+    years = ((dates - dates.min()).dt.days / 365.25).to_numpy()
+
+    def xnpv(rate):
+        return np.sum(cashflows / (1 + rate)**years)
+
+    # Newton-Raphson method to find the rate at which XNPV is 0. Raises RuntimeError if it does not converge
+    return newton(xnpv, 0.1)
+
+
+def main():
+    start_time = time.time()
+    today = pd.Timestamp.today().normalize()
+    transactions = pd.read_csv(CSV_FILE, parse_dates=['date'])
+    usd_to_eur = get_current_price('EUR=X')
+
+    portfolio = Portfolio(transactions, usd_to_eur, today, DIVIDENDS_EUR[CSV_FILE])
+    print('CURRENT HOLDINGS:\n', portfolio.holdings.to_string(index=False), '\n')
+
+    for investment in [portfolio, Benchmark(transactions, usd_to_eur, today, BENCHMARK)]:
+        investment.report()
+    print(f'\nThat took {round(time.time() - start_time)} seconds.')
+
+
+# ---------- Market data (Yahoo Finance) ----------
+
+def get_current_price(ticker):
+    """ Latest price from Yahoo Finance, in the ticker's own currency. None if not found """
+    try:
+        t = yf.Ticker(ticker)
+        price = t.fast_info['last_price']
+        if price is None or pd.isna(price):
+            price = t.basic_info['last_price']
+        return price
+    except Exception:
+        try:
+            return yf.Ticker(ticker).info.get('regularMarketPrice')
+        except Exception:
+            return None
+
+
+def download_daily_open(ticker, start, end):
+    """ Daily Open prices from start up to and including end, forward-filled over weekends and holidays """
+    data = yf.download(ticker, start=start, end=end + pd.Timedelta(days=1), auto_adjust=True, progress=False)
+    data.columns = data.columns.get_level_values(0)
+    return data['Open'].asfreq('D').ffill()
+
+
+def currency_from_ticker(tickers):
+    """
+    Rule of thumb, checked against lookup_currency for the stocks purchased so far:
+    tickers without an exchange suffix (US) and London tickers (*.L) are in USD,
+    other European tickers (e.g. *.DE) in EUR.
+    """
+    is_european = tickers.str.contains(r'\.')
+    is_london = tickers.str.endswith('.L')
+    return np.where(is_european & ~is_london, 'EUR', 'USD')
+
+
+def lookup_currency(ticker):
+    """
+    Slow (about half a second per ticker), so not used in the calculation.
+    Use it to check that currency_from_ticker assigns the right currencies.
+    """
+    try:
+        return yf.Ticker(ticker).info.get('currency', 'EUR')
+    except Exception:
+        return 'NOT found'
 
 
 if __name__ == '__main__':
-    start_time = time.time()
-
-    investigation = AnnualReturnInvestigation()
-    investigation.run_investigation()
-
-    comparison = BenchmarkComparison()
-    comparison.run_benchmark()
-    print(f'That took {round(time.time() - start_time)} seconds.')
+    main()
