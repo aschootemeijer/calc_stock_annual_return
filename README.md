@@ -17,7 +17,7 @@ Still, these first results are very encouraging and provide further support that
 
 <sub>Notes on the stock selection: 1. to keep a sufficiently diversified portfolio, not all stocks for wich the buy signal triggered were bought. 
 2. 4/11 momentum stocks are not in the buy signal list (CNC, DVA, BMPS.MI, ILMN). They are momentum stocks but found using a slightly smaller momentum_factor. 
-3. For privacy reasons, all investment are multiplied by a factor chosen such that the first entry has a value of €100.</sub>
+3. For privacy reasons, all investment in the csv file are multiplied by a factor chosen such that the first entry has a value of €100.</sub>
 
 ### 🚀 Key Features
 - **Automated Data Extraction:** Leverages the `yfinance` API for real-time market prices and currency conversion (USD/EUR).
@@ -46,4 +46,5 @@ This script solves this equation numerically, ensuring an accurate annualized re
 Clone the repository and execute eval.py. E.g., in a Linux terminal, enter:
 - `git clone https://github.com/aschootemeijer/calc_stock_annual_return`
 - `python3 eval.py`
+
 It is possible to investigate your own portfolio: then replace the entries in the csv file with your own investments.
