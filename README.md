@@ -5,8 +5,9 @@
 This project calculates the annualized return (**XIRR**) of an investment portfolio based on transaction data. 
 For comparison, the code also provides the annualized return had the same amount at the same dates been invested in the S&P500.
 <!-- Making use of my astrophysics background, I developed this tool to apply numerical optimization methods to financial datasets. -->
+<br>
 
-## 📈 Result Highlight
+### 📈 Result Highlight
 Investment strategy: we pick stocks from the momentum strategy we devised [here](https://github.com/aschootemeijer/sp500_strategy_backtesting). 
 Starting in May 2026, 11 different stocks were purchased (listed in stock_transactions_normalized.csv). None have been sold so far. At 23.10.2026, the result was:
 - An annualized return of **64.5%** for our momentum strategy. 
@@ -18,12 +19,14 @@ Still, these first results are very encouraging and provide further support that
 <sub>Notes on the stock selection: 1. to keep a sufficiently diversified portfolio, not all stocks for wich the buy signal triggered were bought. 
 2. 4/11 momentum stocks are not in the buy signal list (CNC, DVA, BMPS.MI, ILMN). They are momentum stocks but found using a slightly smaller momentum_factor. 
 3. For privacy reasons, all investment in the csv file are multiplied by a factor chosen such that the first entry has a value of €100.</sub>
+<br>
 
 ### 🚀 Key Features
 - **Automated Data Extraction:** Leverages the `yfinance` API for real-time market prices and currency conversion (USD/EUR).
 - **Accurate Performance Metrics:** Implements the **XIRR (Extended Internal Rate of Return)** algorithm, the industry standard for portfolios with irregular cash flows and dividends.
 - **Numerical Optimization:** Utilizes the **Newton-Raphson method** (`scipy.optimize`) to solve for the Net Present Value (NPV) root.
 - **Data Engineering:** Robust handling of time-series data and market holiday gaps using `pandas`.
+<br>
 
 ### 🧮 Mathematical Background
 The portfolio is treated as a dynamic system. The XIRR calculation is essentially a **root-finding problem**. We seek the rate $r$ such that the sum of all discounted cash flows equals zero:
@@ -36,11 +39,13 @@ Where:
 - $r$ is the annualized internal rate of return (XIRR)
 
 This script solves this equation numerically, ensuring an accurate annualized return regardless of the timing or magnitude of capital injections.
+<br>
 
 ### 🛠️ Tech Stack
 - **Python 3.x**
 - **Pandas & NumPy:** For data transformation and vectorization.
 - **SciPy:** Implementing `optimize.newton` for numerical approximations.
+<br>
 
 ### 💻 Usage
 Clone the repository and execute eval.py. E.g., in a Linux terminal, enter:
