@@ -1,0 +1,4 @@
+__pycache__/
+stock_transactions.csv
+normalize_portfolio.py
+.env
