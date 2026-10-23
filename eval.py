@@ -40,13 +40,13 @@ class Investment(ABC):
     Subclasses only define what the investment is worth today, in value_today.
     """
 
-    def __init__(self, label, transactions, usd_to_eur, today):
+    def __init__(self, label: str, transactions: pd.DataFrame, usd_to_eur: float, today: pd.Timestamp):
         self.label = label
         self.transactions = transactions
         self.usd_to_eur = usd_to_eur
         self.today = today
 
-    def transaction_cashflows(self):
+    def transaction_cashflows(self) -> pd.DataFrame:
         """ Buys (delta_n_stock > 0) are negative cashflow, sales (delta_n_stock < 0) positive """
         direction = np.sign(self.transactions['delta_n_stock'])
         return pd.DataFrame({
@@ -55,14 +55,14 @@ class Investment(ABC):
         })
 
     @abstractmethod
-    def value_today(self):
+    def value_today(self) -> list[float]:
         """ What we would get if we sold everything today: a list of amounts in EUR """
 
-    def cashflows(self):
+    def cashflows(self) -> pd.DataFrame:
         today_rows = pd.DataFrame({'date': self.today, 'cashflow': self.value_today()})
         return pd.concat([self.transaction_cashflows(), today_rows], ignore_index=True)
 
-    def report(self):
+    def report(self) -> None:
         cashflows = self.cashflows()
         annual_return = calc_xirr(cashflows['cashflow'], cashflows['date'])
         profit = cashflows['cashflow'].sum()
@@ -72,12 +72,12 @@ class Investment(ABC):
 class Portfolio(Investment):
     """ The stocks we actually bought: the current value of the holdings plus the dividend received so far """
 
-    def __init__(self, transactions, usd_to_eur, today, dividend_eur):
+    def __init__(self, transactions: pd.DataFrame, usd_to_eur: float, today: pd.Timestamp, dividend_eur: float):
         super().__init__('Our investments', transactions, usd_to_eur, today)
         self.dividend_eur = dividend_eur
         self.holdings = self.get_holdings()
 
-    def get_holdings(self):
+    def get_holdings(self) -> pd.DataFrame:
         """ Stocks currently held, with their current value in EUR """
         holdings = (self.transactions.groupby('ticker', as_index=False)
                     .agg(name=('name', 'first'), n_stock=('delta_n_stock', 'sum')))
@@ -93,7 +93,7 @@ class Portfolio(Investment):
         holdings['value_eur'] = (holdings['n_stock'] * holdings['price'] * to_eur).round(2)
         return holdings
 
-    def value_today(self):
+    def value_today(self) -> list[float]:
         return [self.holdings['value_eur'].sum(), self.dividend_eur]
 
 
@@ -103,13 +103,13 @@ class Benchmark(Investment):
     each sale removes them. Today's value is that of the index units still held.
     """
 
-    def __init__(self, transactions, usd_to_eur, today, benchmark):
+    def __init__(self, transactions: pd.DataFrame, usd_to_eur: float, today: pd.Timestamp, benchmark: str):
         super().__init__(f'Benchmark ({benchmark})', transactions, usd_to_eur, today)
         self.benchmark = benchmark
         daily_price_eur, self.price_now_eur = self.index_prices_eur()
         self.units_held = self.get_units_held(daily_price_eur)
 
-    def index_prices_eur(self):
+    def index_prices_eur(self) -> tuple[pd.Series, float]:
         """ Daily index prices since the first transaction, and the current index price, both in EUR """
         bench = BENCHMARKS[self.benchmark]
         daily_price = download_daily_open(bench['ticker'], start=self.transactions['date'].min(), end=self.today)
@@ -120,7 +120,7 @@ class Benchmark(Investment):
             price_now *= self.usd_to_eur
         return daily_price, price_now
 
-    def get_units_held(self, daily_price_eur):
+    def get_units_held(self, daily_price_eur: pd.Series) -> float:
         """ Index units bought minus index units sold, at the index price on each transaction date """
         price_on_date = self.transactions['date'].map(daily_price_eur)
         if price_on_date.isna().any():
@@ -130,13 +130,13 @@ class Benchmark(Investment):
         direction = np.sign(self.transactions['delta_n_stock'])
         return (direction * self.transactions['transaction_total_eur'] / price_on_date).sum()
 
-    def value_today(self):
+    def value_today(self) -> list[float]:
         return [self.units_held * self.price_now_eur]
 
 
 # ---------- Annual return ----------
 
-def calc_xirr(cashflows, dates):
+def calc_xirr(cashflows: pd.Series, dates: pd.Series) -> float:
     """
     (X)IRR: Internal Rate of Return (or annual return)
     XNPV:   eXtended Net Present Value. Essentially uses time difference between cashflows.
@@ -147,14 +147,14 @@ def calc_xirr(cashflows, dates):
     cashflows = cashflows.to_numpy()
     years = ((dates - dates.min()).dt.days / 365.25).to_numpy()
 
-    def xnpv(rate):
+    def xnpv(rate: float) -> float:
         return np.sum(cashflows / (1 + rate)**years)
 
     # Newton-Raphson method to find the rate at which XNPV is 0. Raises RuntimeError if it does not converge
     return newton(xnpv, 0.1)
 
 
-def main():
+def main() -> None:
     start_time = time.time()
     today = pd.Timestamp.today().normalize()
     transactions = pd.read_csv(CSV_FILE, parse_dates=['date'])
@@ -170,7 +170,7 @@ def main():
 
 # ---------- Market data (Yahoo Finance) ----------
 
-def get_current_price(ticker):
+def get_current_price(ticker: str) -> float | None:
     """ Latest price from Yahoo Finance, in the ticker's own currency. None if not found """
     try:
         t = yf.Ticker(ticker)
@@ -185,14 +185,14 @@ def get_current_price(ticker):
             return None
 
 
-def download_daily_open(ticker, start, end):
+def download_daily_open(ticker: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:
     """ Daily Open prices from start up to and including end, forward-filled over weekends and holidays """
     data = yf.download(ticker, start=start, end=end + pd.Timedelta(days=1), auto_adjust=True, progress=False)
     data.columns = data.columns.get_level_values(0)
     return data['Open'].asfreq('D').ffill()
 
 
-def currency_from_ticker(tickers):
+def currency_from_ticker(tickers: pd.Series) -> np.ndarray:
     """
     Rule of thumb, checked against lookup_currency for the stocks purchased so far:
     tickers without an exchange suffix (US) and London tickers (*.L) are in USD,
@@ -203,7 +203,7 @@ def currency_from_ticker(tickers):
     return np.where(is_european & ~is_london, 'EUR', 'USD')
 
 
-def lookup_currency(ticker):
+def lookup_currency(ticker: str) -> str:
     """
     Slow (about half a second per ticker), so not used in the calculation.
     Use it to check that currency_from_ticker assigns the right currencies.
