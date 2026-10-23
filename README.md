@@ -2,7 +2,8 @@
 
 ## Investment Performance Analyzer (XIRR Method)
 
-This project calculates the annualized return (**XIRR**) of an investment portfolio based on transaction data. Making use of my astrophysics background, I developed this tool to apply numerical optimization methods to financial datasets.
+This project calculates the annualized return (**XIRR**) of an investment portfolio based on transaction data. 
+<!-- Making use of my astrophysics background, I developed this tool to apply numerical optimization methods to financial datasets. -->
 For comparison, this code also provides the annualized return had the same amount at the same dates been invested in the S&P500.
 
 ## Result Highlight
