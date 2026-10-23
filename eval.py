@@ -8,7 +8,13 @@ import time
 from scipy.optimize import newton
 start_time = time.time()
 
-benchmark = 'SP500'
+benchmark  = 'SP500'   # choose from the keys of BENCHMARKS
+BENCHMARKS = { 'SP500': {'ticker': '^GSPC',  'currency': 'USD'},
+               'DAX':   {'ticker': '^GDAXI', 'currency': 'EUR'} }
+
+csv_file      = 'stock_transactions_normalized.csv'   # choose from the keys of DIVIDENDS_EUR
+DIVIDENDS_EUR = { 'stock_transactions_normalized.csv': 3,      # total dividend received so far
+                  'stock_transactions.csv':            1100 }
 
 class AnnualReturnInvestigation:
 
@@ -23,7 +29,7 @@ class AnnualReturnInvestigation:
 
     def load_stocks( self ):
         #d = pd.read_csv( '/mnt/c/Users/hp/Desktop/dinges/fin/resultaten_evalueren/stock_transactions.csv', delimiter=',' )
-        d = pd.read_csv( 'stock_transactions_normalized.csv', delimiter=',' )
+        d = pd.read_csv( csv_file, delimiter=',' )
         #d = d[ d['mom25']=='y' ]
         return d
 
@@ -34,9 +40,16 @@ class AnnualReturnInvestigation:
         except Exception:
             return 'NOT found'
 
-    def add_currency_column_quickly( self, d ):   # this gives the same currencies as the get_currency() method 
-        #d['currency'] = np.where( (d['ticker'].str.contains(r'\.') & (d['ticker']!='XNID.L')), 'EUR', 'USD' )
-        d['currency'] = np.where( (d['ticker'].str.contains(r'\.') & (~d['ticker'].isin( ['XNID.L','WNDE.L']))), 'EUR', 'USD' )
+    def add_currency_column_quickly( self, d ):
+        """
+        Rule of thumb, checked against the slow add_currency_column method for the stocks purchased so far:
+        tickers without an exchange suffix (US) and London tickers (*.L) are in USD, other European tickers (e.g. *.DE) in EUR.
+        The dividend row has no ticker; it is already in EUR.
+        """
+        is_european   = d['ticker'].str.contains( r'\.', na=False )
+        is_london     = d['ticker'].str.endswith( '.L', na=False )
+        d['currency'] = np.where( is_european & ~is_london, 'EUR', 'USD' )
+        d.loc[ d['ticker'].isna(), 'currency' ] = 'EUR'
         return d
 
     def add_cashflow_column( self, d, dividend_in_eur ):
@@ -97,23 +110,21 @@ class AnnualReturnInvestigation:
         def xnpv(rate, cashflows, dates):
             start_date = min(dates)
             return sum([cf / (1 + rate)**((d - start_date).days / 365.25) for cf, d in zip(cashflows, dates)])
-        # Newton-Raphson method to find rate at which XNPV is 0
-        try:
-            return np.round(newton(lambda r: xnpv(r, cashflows, dates), 0.1) * 100, 1)
-        except RuntimeError:
-            return 0.0
+        if pd.isna( cashflows ).any():
+            raise ValueError( 'Cannot calculate XIRR: some cashflows are missing (NaN).' )
+        # Newton-Raphson method to find rate at which XNPV is 0. Raises RuntimeError if it does not converge
+        return np.round(newton(lambda r: xnpv(r, cashflows, dates), 0.1) * 100, 1)
 
     def run_investigation( self ):
         d_raw = self.load_stocks()
 
         # PRE-PROCESSING
-        dividend_in_eur = 3
-        #dividend_in_eur = 1100  for all
-        #dividend_in_eur = 1100/17
-        d = self.add_cashflow_column( d_raw, dividend_in_eur )
+        d = self.add_cashflow_column( d_raw, DIVIDENDS_EUR[ csv_file ] )
         d = self.add_currency_column_quickly( d )
-        print( d.iloc[70:100,:] )
         d['current_value_per_stock'] = d['ticker'].apply( self.add_column_with_current_value_per_stock )
+        missing = d.loc[ d['ticker'].notna() & d['current_value_per_stock'].isna(), 'ticker' ].unique()
+        if len( missing ) > 0:
+            raise ValueError( f'Could not get a current price for: {", ".join(missing)}' )
         d = self.add_column_with_current_value_total(d)
 
 
@@ -125,47 +136,50 @@ class AnnualReturnInvestigation:
         print( f"Total profit: {np.round( sum(d['cashflow']),2 )} EUR" )
 
 
-class BenchmarkWithSP500( AnnualReturnInvestigation ):
+class BenchmarkComparison( AnnualReturnInvestigation ):
 
     """
     We use inheritance. This gives this class the methods from its parent class AnnualReturnInvestigation
-    This child class can calculate the annual returns had we invested in the S&P500 instead of the stocks we chose, at the times we bought them.
+    This child class calculates the annual returns had we invested in the benchmark index instead of the stocks we chose,
+    with the same euro amounts at the same dates (buys and sales).
     """
-    
-    def add_sp500_columns( self, d ):
-        d['date']          = pd.to_datetime( d['date'] )
-        #sp500              = yf.download( '^GSPC',start=d['date'].min(), end=self.vandaag)
-        sp500              = yf.download( '^GDAXI',start=d['date'].min(), end=self.vandaag)
-        sp500.columns      = sp500.columns.get_level_values(0)
-        sp500              = sp500.asfreq('D').ffill()
-        sp500              = sp500.reset_index()
-        sp500_now          = sp500.Open.iloc[-1]
-        d                  = d.merge( sp500[['Date','Open']], how='left', left_on='date', right_on='Date' )
-        d                  = d.rename( columns={'Open':'SP500'} )
-        d['delta_n_sp500'] = [ t/s for t,s in zip(d['transaction_total_eur'],d['SP500']) ] 
-        #d['SP500_now_div_then'] = sp500_now / d.Close
-        d = d.drop( columns=['Date','broker'] )
-        d                  = d[ d['ticker'] != 'HPE' ]      
 
-        d['cashflow']      = [-t if dn>= 0 else t for dn,t in zip(d['delta_n_stock'],d['transaction_total_eur'])]
+    def download_daily( self, ticker, start ):
+        """ Daily Open prices from Yahoo Finance, forward-filled over weekends and holidays """
+        data         = yf.download( ticker, start=start, end=self.vandaag, auto_adjust=True )
+        data.columns = data.columns.get_level_values(0)
+        return data['Open'].asfreq('D').ffill()
 
-        # add important row with TODAY's VALUE 
-        current_value                  = sum( d['delta_n_sp500'] ) * sp500_now  #d['SP500'].iloc[-1]
-        d.loc[ len(d)+1,'name']          = 'current_value'
-        d.at[ d.index[-1],'cashflow' ] = current_value
-        d.at[ d.index[-1], 'SP500' ]   = sp500_now
-        d.at[ d.index[-1], 'date' ]    = pd.Timestamp.now().normalize()  # self.vandaag
-        #for i in d.index:
-        #    print( d.loc[i,'cashflow'], d.loc[i,'date'] )
-        #print( d['delta_n_sp500'] )
+    def add_benchmark_columns( self, d ):
+        bench         = BENCHMARKS[ benchmark ]
+        d['date']     = pd.to_datetime( d['date'] )
+        d_bench       = self.download_daily( bench['ticker'], start=d['date'].min() )
+        if bench['currency'] == 'USD':   # convert the index to EUR at each day's exchange rate
+            usd_to_eur = self.download_daily( 'EUR=X', start=d['date'].min() )
+            d_bench    = ( d_bench * usd_to_eur ).ffill()
+        d_bench       = d_bench.rename( 'bench_price_eur' ).rename_axis( 'date' ).reset_index()
+        bench_now_eur = d_bench['bench_price_eur'].iloc[-1]
+        d             = d.merge( d_bench, how='left', on='date' )
+
+        # Buys (delta_n_stock > 0) add benchmark units and are negative cashflow; sales remove units and are positive cashflow
+        direction          = np.sign( d['delta_n_stock'] )
+        d['delta_n_bench'] = direction * d['transaction_total_eur'] / d['bench_price_eur']
+        d['cashflow']      = -direction * d['transaction_total_eur']
+
+        # add important row with TODAY's VALUE of the benchmark units still held
+        current_value                         = d['delta_n_bench'].sum() * bench_now_eur
+        d.loc[ len(d), 'name' ]               = 'current_value'
+        d.at[ d.index[-1], 'cashflow' ]        = current_value
+        d.at[ d.index[-1], 'bench_price_eur' ] = bench_now_eur
+        d.at[ d.index[-1], 'date' ]            = pd.Timestamp( self.vandaag )
         return d
 
     def run_benchmark( self ):
         d_raw = self.load_stocks()
-        d     = self.add_sp500_columns( d_raw )
+        d     = self.add_benchmark_columns( d_raw )
         print( 'BENCHMARK DATAFRAME:\n', d )
         avg_ylry_returns = self.calc_xirr( d['cashflow'], d['date'])
-        print( f'\nBenchmarking with S&P500. Annual return: {avg_ylry_returns}%' ) 
+        print( f'\nBenchmarking with {benchmark}. Annual return: {avg_ylry_returns}%' )
         print( f"Total profit: {np.round( sum(d['cashflow']),2 )} EUR" )
 
 
@@ -173,7 +187,7 @@ if __name__ == "__main__":
     investigation = AnnualReturnInvestigation( )
     investigation.run_investigation( )
 
-    benchmark = BenchmarkWithSP500( )
-    benchmark.run_benchmark( )
+    comparison = BenchmarkComparison( )
+    comparison.run_benchmark( )
     print( f"That took { int(time.time()-start_time+0.5) } seconds.")
 
