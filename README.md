@@ -7,7 +7,7 @@ For comparison, this code also provides the annualized return had the same amoun
 <!-- Making use of my astrophysics background, I developed this tool to apply numerical optimization methods to financial datasets. -->
 
 ## 📈 Result Highlight
-Investment strategy: we pick stocks from the momentum strategy we devised (https://github.com/aschootemeijer/sp500_strategy_backtesting). 
+Investment strategy: we pick stocks from the momentum strategy we devised [here](https://github.com/aschootemeijer/sp500_strategy_backtesting). 
 Starting in May 2026, 11 different stocks were purchased (listed in stock_transactions_normalized.csv). None have been sold so far. At 23.10.2026, the result was:
 - An annualized return of **64.5%** for our momentum strategy. 
 - An annualized return of **9.5%** for the S&P500 benchmark. 
