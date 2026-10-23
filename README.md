@@ -11,7 +11,8 @@ For comparison, the code also provides the annualized return had the same euro a
 Investment strategy: we pick stocks from the momentum strategy we devised [here](https://github.com/aschootemeijer/sp500_strategy_backtesting). 
 Starting in May 2026, 11 different stocks were purchased for a real portfolio (listed in stock_transactions_normalized.csv). None have been sold so far. At 23.10.2026, the result was:
 - An annualized return of **72.1%** for our momentum strategy. 
-- An annualized return of **18.7%** for the S&P 500 benchmark (in euros; the stronger dollar adds to this). 
+- An annualized return of **18.4%** for the S&P 500 benchmark (in euros; the stronger dollar adds to this). 
+- An annualized return of **5.2%** for the DAX benchmark. 
 
 Conclusion: given the low number of investments (11) and short holding periods (0-5 months), this offers less support for the momentum strategy than the backtesting. We caution that an annual return rate this high may not be sustainable.
 Still, these first results are very encouraging and provide further support that our momentum strategy works.
