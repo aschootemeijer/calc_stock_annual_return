@@ -7,13 +7,14 @@ For comparison, this code also provides the annualized return had the same amoun
 
 ## Result Highlight
 Investment strategy: we pick stocks from the momentum strategy we devised (https://github.com/aschootemeijer/sp500_strategy_backtesting). 
-Starting in May 2026, 11 different stocks were purchased (listed in stock_transactions_normalized.csv). None have been sold so far. At 23.10.2026, the result was as follows:
-- Our investment strategy gave an annualized return of **62.5%**. 
-- The S&P500 benchmark gave an annualized return of **9.7%**. 
-Conclusion: given the low number of investments (11) and short holding periods (0-5 months), this offers less support for the momentum strategy than the backtesting.
+Starting in May 2026, 11 different stocks were purchased (listed in stock_transactions_normalized.csv). None have been sold so far. At 23.10.2026, the result was:
+- An annualized return of **64.5%** for our momentum strategy. 
+- An annualized return of **9.5%** for the S&P500 benchmark. 
+
+Conclusion: given the low number of investments (11) and short holding periods (0-5 months), this offers less support for the momentum strategy than the backtesting. An annual return rate this high may not be sustainable.
 Still, these first results are very encouraging and provide further support that our momentum strategy works.
 
-<small>Notes on the stock selection: 1. to keep a sufficiently diversified portfolio, not all stocks for wich the buy signal triggered were bought. 2. 3/11 momentum stocks are not in the buy signal list. They are momentum stocks but with a slightly smaller momentum_factor</small>
+<sub>Notes on the stock selection: 1. to keep a sufficiently diversified portfolio, not all stocks for wich the buy signal triggered were bought. 2. 3/11 momentum stocks are not in the buy signal list. They are momentum stocks but with a slightly smaller momentum_factor</sub>
 
 ### 🚀 Key Features
 - **Automated Data Extraction:** Leverages the `yfinance` API for real-time market prices and currency conversion (USD/EUR).
